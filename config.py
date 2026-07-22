@@ -34,12 +34,30 @@ CHUNK_OVERLAP = 15   # overlapping words between consecutive chunks
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 # ---------------------------------------------------------------------------
+# Retrieval quality controls
+# ---------------------------------------------------------------------------
+USE_HYBRID = True             # fuse dense (Chroma) + lexical (BM25) search
+USE_RERANKER = True           # cross-encoder re-ranking of fused candidates
+USE_MMR = True                # diversify the re-ranked candidates (MMR)
+
+TOP_K_INITIAL = 20            # candidates pulled per method before fusion
+TOP_K_RERANK = 8              # candidates kept after cross-encoder re-ranking
+RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+RRF_K = 60                    # Reciprocal Rank Fusion constant
+MMR_LAMBDA = 0.7              # 1.0 = pure relevance, 0.0 = pure diversity
+
+SIMILARITY_THRESHOLD = 0.15   # min dense cosine score to enter the dense candidate list
+CONFIDENCE_GAP = 0.15         # if top doc beats 2nd doc by this fraction, use ONE document only
+
+# ---------------------------------------------------------------------------
 # Context building
 # ---------------------------------------------------------------------------
-RETRIEVAL_K = 8              # how many candidates to pull from the vector store
-MAX_CONTEXT_CHUNKS = 3        # how many chunks actually go into the final prompt
-MAX_CHUNKS_PER_DOCUMENT = 1   # keep the context diverse across articles
-WORD_BUDGET = 150             # cap on total words inside the context
+RETRIEVAL_K = TOP_K_INITIAL    # kept for backward compatibility with older calls
+MAX_CONTEXT_DOCUMENTS = 3      # how many distinct articles may appear in the context
+MAX_CHUNKS_PER_DOCUMENT = 3    # chunks merged together per article ("context grouping")
+WORD_BUDGET = 220              # cap on total words inside the context
+MAX_CONTEXT_CHUNKS = MAX_CONTEXT_DOCUMENTS  # legacy alias, some old code still reads this
 
 # ---------------------------------------------------------------------------
 # OpenRouter (LLM) — never hardcode a real key here.

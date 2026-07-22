@@ -2,6 +2,7 @@ import datetime
 
 import streamlit as st
 
+import config
 from _pipeline_utils import load_module
 
 documents_step = load_module("01_documents.py", "documents_step")
@@ -35,6 +36,24 @@ def ensure_index_ready():
     chunks_df = chunking_step.build_chunks(preprocessed_df)
     collection = chroma_store.build_store(chunks_df, reset=True)
     return collection, collection.count()
+
+
+@st.cache_resource(show_spinner=False)
+def ensure_bm25_ready():
+    """Lexical (BM25) index used for hybrid retrieval. Built once from Chroma."""
+    if not config.USE_HYBRID:
+        return None
+    collection = chroma_store.get_chroma_collection(reset=False)
+    return retrieve_context.build_bm25_index(collection)
+
+
+@st.cache_resource(show_spinner=False)
+def ensure_reranker_ready():
+    """Cross-encoder re-ranking model, loaded once and cached across reruns."""
+    if not config.USE_RERANKER:
+        return None
+    from sentence_transformers import CrossEncoder
+    return CrossEncoder(config.RERANKER_MODEL)
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +198,9 @@ st.markdown(
 # ---------------------------------------------------------------------------
 try:
     with st.spinner("Indexing the newsroom archive - first run only, please wait..."):
-        _, chunk_count = ensure_index_ready()
+        collection, chunk_count = ensure_index_ready()
+        bm25_bundle = ensure_bm25_ready()
+        reranker = ensure_reranker_ready()
 except FileNotFoundError as e:
     st.error(
         f"{e}\n\nThe app can't build its index because the BBC News articles "
@@ -240,7 +261,12 @@ ask_clicked = st.button("Ask the archive", type="primary")
 # ---------------------------------------------------------------------------
 if ask_clicked and query.strip():
     with st.spinner("Searching the archive for relevant reporting..."):
-        package = retrieve_context.build_context_package(query)
+        package = retrieve_context.build_context_package(
+            query,
+            collection=collection,
+            bm25_bundle=bm25_bundle,
+            reranker=reranker,
+        )
 
     if package["num_sources"] == 0:
         st.warning("No passages passed the relevance filters for this question. Try rephrasing it.")
@@ -269,6 +295,21 @@ if ask_clicked and query.strip():
                 """,
                 unsafe_allow_html=True,
             )
+
+        with st.expander("Retrieval diagnostics (dense / BM25 / RRF / rerank scores)"):
+            diagnostics_rows = [
+                {
+                    "chunk_id": c["chunk_id"],
+                    "document_id": c["document_id"],
+                    "source_file": c["source_file"],
+                    "dense_score": round(c["dense_score"], 4) if c["dense_score"] is not None else None,
+                    "bm25_score": round(c["bm25_score"], 4) if c["bm25_score"] is not None else None,
+                    "rrf_score": round(c["rrf_score"], 4) if c["rrf_score"] is not None else None,
+                    "rerank_score": round(c["rerank_score"], 4) if c["rerank_score"] is not None else None,
+                }
+                for c in package["candidates"]
+            ]
+            st.dataframe(diagnostics_rows, use_container_width=True, hide_index=True)
 
 elif ask_clicked:
     st.warning("Type a question first.")

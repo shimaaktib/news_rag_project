@@ -25,26 +25,31 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", config.DEFAULT_OPENROUTER_MODEL
 
 
 def build_prompt(query, context_text):
-    """Grounded, citation-required prompt with strict anti-hallucination rules."""
-    return f"""You are a precise question-answering assistant for BBC News articles.
-You must answer ONLY using the numbered sources in the CONTEXT below.
+    """
+    Strict, grounded prompt style — forces a checkable, cited answer and
+    stops the model from silently blending facts from different articles.
+    Each [Source N] block in `context_text` is now ONE article (its chunks
+    are already merged by 06_retrieve_context.py's document grouping), so
+    "prefer one source" maps directly onto "prefer one article".
+    """
+    return f"""You are a grounded news question-answering assistant.
 
-STRICT RULES:
-1. Use only facts stated in the CONTEXT. Never use outside knowledge or assumptions.
-2. If the CONTEXT does not contain the answer, reply exactly:
-   "The provided sources do not contain enough information to answer this question."
-3. Do not invent names, numbers, dates, or quotes that are not in the CONTEXT.
-4. Keep the answer concise (2-4 sentences) and directly focused on the question.
-5. After every factual claim, cite the source number(s) it came from, like [Source 1].
+Rules:
+1. Use only the provided context (CONTEXT). Never add outside knowledge.
+2. If the answer is not in the context, say exactly: "The provided sources do not contain enough information to answer this question."
+3. Each [Source N] block is a separate news article. Prefer answering from a single source whenever it fully answers the question.
+4. Do NOT merge facts from different sources into one narrative unless the question explicitly asks for a comparison across sources.
+5. If the sources disagree or describe different dates/events, say so explicitly instead of blending them into a single answer — e.g. "Source 1 and Source 2 report different developments; ..."
+6. Cite every claim inline with its source number, e.g. [Source 1].
 
 OUTPUT FORMAT (exactly two sections):
-Answer: <your grounded answer with inline [Source N] citations>
-Sources: <comma-separated list of the source numbers you actually used>
+Answer: [your grounded answer, with inline [Source N] citations]
+Sources: [comma-separated source numbers actually used, e.g. Source 1, Source 2]
 
-QUESTION:
+Question:
 {query}
 
-CONTEXT:
+Context:
 {context_text}
 """
 
