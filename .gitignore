@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# generated pipeline artifacts (rebuild locally with the numbered scripts)
+data/processed/
+chroma_store/
+
+.streamlit/secrets.toml
