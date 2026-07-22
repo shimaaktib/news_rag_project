@@ -303,14 +303,40 @@ def build_context_package(
             "score": group["score"],
         })
 
+    
+    scores = [g["score"] for g in groups] if groups else []
+    top_score = scores[0] if scores else 0.0
+    second_score = scores[1] if len(scores) > 1 else 0.0
+
+    max_ref = max(scores) if scores else 1.0
+    for src in selected_flat:
+        raw = src.get("score", 0.0)
+        src["similarity_pct"] = round(100 * raw / max_ref, 1) if max_ref else 0.0
+
+    if top_score > 0:
+        gap = (top_score - second_score) / abs(top_score) if second_score else 1.0
+        confidence = max(0.0, min(1.0, 0.5 * min(top_score, 1.0) + 0.5 * gap))
+    else:
+        confidence = 0.0
+
+    if confidence >= 0.66:
+        confidence_label = "High"
+    elif confidence >= 0.4:
+        confidence_label = "Medium"
+    else:
+        confidence_label = "Low"
+
     return {
         "query": query,
-        "candidates": candidates,          # post rerank/MMR, pre-grouping - for diagnostics
+        "candidates": candidates,
         "groups": groups,
         "selected": selected_flat,
         "context_text": "\n\n".join(blocks),
         "used_words": used_words,
         "num_sources": len(selected_flat),
+        "confidence": round(confidence, 3),
+        "confidence_pct": round(confidence * 100, 1),
+        "confidence_label": confidence_label,
     }
 
 

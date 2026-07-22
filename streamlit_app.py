@@ -275,8 +275,22 @@ if ask_clicked and query.strip():
             answer = rag.ask_llm(query, package["context_text"])
 
         st.markdown('<div class="section-label">The Answer</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="answer-card"><p>{answer}</p></div>', unsafe_allow_html=True)
 
+        conf_colors = {"High": "#1f6f3d", "Medium": "#b58900", "Low": "#b0341c"}
+        conf_color = conf_colors.get(package["confidence_label"], "#888")
+        st.markdown(
+            f"""
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <span style="background:{conf_color};color:#fff;font-family:Inter,sans-serif;
+                    font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;
+                    padding:4px 12px;border-radius:3px;">
+                    {package['confidence_label']} confidence · {package['confidence_pct']}%
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(f'<div class="answer-card"><p>{answer}</p></div>', unsafe_allow_html=True)
         st.markdown(
             '<div class="section-label" style="margin-top:26px;">Sources Cited</div>',
             unsafe_allow_html=True,
@@ -288,7 +302,7 @@ if ask_clicked and query.strip():
                 <div class="source-card">
                     <div class="source-head">
                         <span class="cat-badge" style="background:{color};">{row['category']}</span>
-                        <span class="source-file">Source {i} &middot; {row['source_file']}</span>
+                        <span class="source-file">Source {i} &middot; {row['source_file']} &middot; {row.get('similarity_pct', 0)}% match</span>
                     </div>
                     <div class="source-text">{row['chunk_text']}</div>
                 </div>
